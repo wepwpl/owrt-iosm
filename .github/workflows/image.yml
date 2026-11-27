@@ -23,14 +23,10 @@ jobs:
 
       - name: Pasang dependensi
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential clang flex bison g++ gawk \
-            gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev \
-            python3-setuptools python3-dev python3-pyelftools rsync swig unzip \
-            zlib1g-dev file wget libelf-dev
+          sudo bash -c 'bash <(curl -s https://immortalwrt.org)'
 
       - name: Clone ImmortalWrt
-        run: git clone --depth 1 --branch v${{ inputs.version }} https://github.com/immortalwrt/immortalwrt.git openwrt
+        run: git clone --depth 1 --branch v${{ inputs.version }} https://github.com openwrt
 
       - name: Feeds
         working-directory: openwrt
@@ -41,7 +37,6 @@ jobs:
       - name: Tambah paket kmod-iosm
         working-directory: openwrt
         run: |
-          grep -rn "KernelPackage/wwan" package/kernel/linux/modules/ || true
           cat > package/kernel/linux/modules/iosm.mk <<'EOF'
 
           define KernelPackage/iosm
@@ -59,7 +54,7 @@ jobs:
 
           $(eval $(call KernelPackage,iosm))
           EOF
-          grep -rqE '^define KernelPackage/wwan$' package/kernel/linux/modules/ --exclude=iosm.mk || cat >> package/kernel/linux/modules/iosm.mk <<'EOF'
+          grep -rq "KernelPackage/wwan" package/kernel/linux/modules/ --exclude=iosm.mk || cat >> package/kernel/linux/modules/iosm.mk <<'EOF'
 
           define KernelPackage/wwan
             SUBMENU:=WWAN Support
@@ -75,7 +70,7 @@ jobs:
       - name: Konfigurasi
         working-directory: openwrt
         run: |
-          curl -fL https://downloads.immortalwrt.org/releases/${{ inputs.version }}/targets/x86/64/config.buildinfo -o .config
+          curl -fL https://immortalwrt.org{{ inputs.version }}/targets/x86/64/config.buildinfo -o .config
           cat >> .config <<'EOF'
           CONFIG_PACKAGE_kmod-iosm=y
           CONFIG_PACKAGE_kmod-wwan=y
@@ -85,6 +80,7 @@ jobs:
           CONFIG_PACKAGE_luci-app-mwan3=y
           CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
           CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
+          CONFIG_PACKAGE_pciutils=y
           CONFIG_TARGET_ROOTFS_PARTSIZE=1024
           EOF
           make defconfig
@@ -102,6 +98,8 @@ jobs:
         run: |
           mkdir -p ../out
           cp bin/targets/x86/64/*squashfs-combined-efi.img.gz ../out/
+          cp bin/targets/x86/64/packages/*iosm* ../out/ || true
+          cp bin/targets/x86/64/packages/*wwan* ../out/ || true
           cd ../out
           sha256sum * > sha256sums.txt
           ls -lh
