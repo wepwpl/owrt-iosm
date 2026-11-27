@@ -41,8 +41,8 @@ jobs:
       - name: Tambah paket kmod-iosm
         working-directory: openwrt
         run: |
-          grep -q "KernelPackage/wwan" package/kernel/linux/modules/wwan.mk || { echo "wwan.mk tidak punya kmod-wwan"; exit 1; }
-          cat >> package/kernel/linux/modules/wwan.mk <<'EOF'
+          grep -rn "KernelPackage/wwan" package/kernel/linux/modules/ || true
+          cat > package/kernel/linux/modules/iosm.mk <<'EOF'
 
           define KernelPackage/iosm
             SUBMENU:=WWAN Support
@@ -59,6 +59,19 @@ jobs:
 
           $(eval $(call KernelPackage,iosm))
           EOF
+          grep -rqE '^define KernelPackage/wwan$' package/kernel/linux/modules/ --exclude=iosm.mk || cat >> package/kernel/linux/modules/iosm.mk <<'EOF'
+
+          define KernelPackage/wwan
+            SUBMENU:=WWAN Support
+            TITLE:=WWAN Driver Core
+            KCONFIG:=CONFIG_WWAN
+            FILES:=$(LINUX_DIR)/drivers/net/wwan/wwan.ko
+            AUTOLOAD:=$(call AutoProbe,wwan)
+          endef
+
+          $(eval $(call KernelPackage,wwan))
+          EOF
+          head -n 40 package/kernel/linux/modules/iosm.mk
 
       - name: Konfigurasi
         working-directory: openwrt
